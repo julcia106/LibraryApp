@@ -1,45 +1,51 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 using LibraryApp.Models;
 using LibraryApp.Data;
 using LibraryApp.ViewModels;
 using Microsoft.EntityFrameworkCore;
+using LibraryApp.Repository;
+using AutoMapper;
+using System.Web.Http;
+using HttpGetAttribute = Microsoft.AspNetCore.Mvc.HttpGetAttribute;
+using HttpDeleteAttribute = Microsoft.AspNetCore.Mvc.HttpDeleteAttribute;
+using System.Collections.Generic;
+using HttpPostAttribute = Microsoft.AspNetCore.Mvc.HttpPostAttribute;
 
 namespace LibraryApp.Controllers
 {
     public class BooksController : Controller
     {
         private readonly ApplicationDbContext _context;
+        private readonly IBookRepository _bookRepository;
 
-        public BooksController(ApplicationDbContext context)
+        public BooksController(ApplicationDbContext context, IBookRepository bookRepository)
         {
             _context = context;
+            _bookRepository = bookRepository;
         }
-        public IActionResult Random()
+
+        [Authorize(Roles = "User,StoreManager,Owner")]
+        public IActionResult Index()
         {
-            var firstBook = new Book() { Name = "English dictionary" };
-            return View(firstBook);
+            var books = _bookRepository.GetAll();
+
+            return View(books);
         }
 
-        public IActionResult New()
+        public IActionResult Details(int id)
         {
-            var genres = _context.Genre.ToList();
-            var viewModel = new BookFormViewModel
-            {
-                Genres = genres
-            };
+            var book = _bookRepository.Get(id);
 
-            return View("BookForm", viewModel);
+            return View(book);
         }
 
+        [Authorize(Roles = "StoreManager,Owner")]
         public IActionResult Edit(int id)
         {
-            var book = _context.Books.SingleOrDefault(b => b.Id == id);
-
-            if(book == null)
+            var book = _bookRepository.Get(id);
+            if (book == null)
             {
                 return NotFound();
             }
@@ -49,39 +55,42 @@ namespace LibraryApp.Controllers
                 Book = book,
                 Genres = _context.Genre.ToList()
             };
+
             return View("BookForm", viewModel);
         }
 
-        public IActionResult Index()
+        [Authorize(Roles = "StoreManager,Owner")]
+        public IActionResult New()
         {
-            var books = _context.Books
-                .Include(b => b.Genre)
-                .ToList();
+            var viewModel = new BookFormViewModel
+            {
+                Genres = _context.Genre.ToList()
+            };
 
-            return View(books);
+            return View("BookForm", viewModel);
         }
 
+        [HttpPost]
         public IActionResult Save(Book book)
         {
-            if(book.Id == 0)
+            if (!ModelState.IsValid)
+            {
+                return New();
+            }
+
+            if (book.Id == 0)
             {
                 book.DateAdded = DateTime.Now;
-                _context.Books.Add(book);
+                _bookRepository.Add(book);
             }
             else
             {
-                var bookInDb = _context.Books.SingleOrDefault(b => b.Id == book.Id);
-                bookInDb.Name = book.Name;
-                bookInDb.AuthorName = book.AuthorName;
-                bookInDb.GenreId = book.GenreId;
-                bookInDb.DateAdded = book.DateAdded;
-                bookInDb.ReleaseDate = book.ReleaseDate;
-                bookInDb.NumberInStock = book.NumberInStock;
+                _bookRepository.Update(book);
             }
 
             try
             {
-                _context.SaveChanges();
+                _bookRepository.Save();
             }
             catch (DbUpdateException e)
             {

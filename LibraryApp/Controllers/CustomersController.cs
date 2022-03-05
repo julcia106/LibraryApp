@@ -5,11 +5,40 @@ using System.Linq;
 using System.Threading.Tasks;
 using LibraryApp.Models;
 using LibraryApp.ViewModels;
+using LibraryApp.Data;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
 
 namespace LibraryApp.Controllers
 {
     public class CustomersController : Controller
     {
+        private readonly ApplicationDbContext _context;
+
+        public CustomersController(ApplicationDbContext context)
+        {
+            _context = context;
+        }
+
+        [Authorize(Roles = "StoreManager,Owner")]
+        public ViewResult Index()
+        {
+            return View();
+        }
+
+        public IActionResult Details(int id)
+        {
+            var customer = _context.Customers
+                .Include(c => c.MembershipType)
+                .SingleOrDefault(c => c.Id == id);
+
+            if (customer == null)
+            {
+                return Content("User not found");
+            }
+
+            return View(customer);
+        }
 
         public IActionResult New()
         {
@@ -19,14 +48,13 @@ namespace LibraryApp.Controllers
                 MembershipTypes = membershipTypes
             };
 
-            return View(viewModel);
+            return View("CustomerForm", viewModel);
         }
-
 
         public IActionResult Edit(int id)
         {
             var customer = _context.Customers.SingleOrDefault(c => c.Id == id);
-            if(customer == null)
+            if (customer == null)
             {
                 return NotFound();
             }
@@ -37,33 +65,6 @@ namespace LibraryApp.Controllers
             };
 
             return View("CustomerForm", viewModel);
-        }
-        public ViewResult Index()
-        {
-            var customers = GetCustomers();
-
-            return View(customers);
-        }
-
-        public IActionResult Details(int id)
-        {
-            var customer = GetCustomers().SingleOrDefault(c => c.Id == id);
-
-            if (customer == null)
-            {
-                return Content("User not found");
-            }
-
-            return View(customer);
-        }
-
-        private IEnumerable<Customer> GetCustomers()
-        {
-            return new List<Customer>
-            {
-                new Customer { Id = 1, Name = "Jan Kowalski" },
-                new Customer { Id = 2, Name = "Monika Nowak" }
-            };
         }
 
         [HttpPost]
@@ -78,8 +79,9 @@ namespace LibraryApp.Controllers
                 };
 
                 return View("CustomerForm", viewModel);
+
             }
-            if(customer.Id == 0)
+            if (customer.Id == 0)
             {
                 _context.Customers.Add(customer);
             }
@@ -92,8 +94,14 @@ namespace LibraryApp.Controllers
                 customerInDb.HasNewsletterSubscribed = customer.HasNewsletterSubscribed;
             }
 
-            _context.Customer.Add(customer);
-            _context.SaveChanges();
+            try
+            {
+                _context.SaveChanges();
+            }
+            catch (DbUpdateException e)
+            {
+                Console.WriteLine(e);
+            }
 
             return RedirectToAction("Index", "Customers");
         }
