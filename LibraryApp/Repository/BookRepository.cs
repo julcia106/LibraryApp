@@ -23,14 +23,14 @@ namespace LibraryApp.Repositories
 
         public void Update(Book book)
         {
-            var bookToUpdate = _context.Books.Find(book.Id);
+            var model = _context.Books.Find(book.Id);
 
-            bookToUpdate.Name = book.Name;
-            bookToUpdate.AuthorName = book.AuthorName;
-            bookToUpdate.GenreId = book.GenreId;
-            bookToUpdate.ReleaseDate = book.ReleaseDate;
-            bookToUpdate.DateAdded = book.DateAdded;
-            bookToUpdate.NumberInStock = book.NumberInStock;
+            model.Name = book.Name;
+            model.AuthorName = book.AuthorName;
+            model.GenreId = book.GenreId;
+            model.ReleaseDate = book.ReleaseDate;
+            model.DateAdded = book.DateAdded;
+            model.NumberInStock = book.NumberInStock;
         }
 
         public void Delete(int id)
